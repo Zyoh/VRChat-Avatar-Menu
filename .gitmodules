@@ -1,3 +1,0 @@
-[submodule "submodules/Rust-VRChat-OSC"]
-	path = submodules/Rust-VRChat-OSC
-	url = https://github.com/Zyoh/Rust-VRChat-OSC

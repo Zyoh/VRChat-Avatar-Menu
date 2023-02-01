@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Zoe <zoe@zyoh.ca>"]
 
 [dependencies]
-vrchat_osc = { path = "../submodules/Rust-VRChat-OSC/vrchat-osc" }
+vrchat_osc = { git = "https://github.com/Zyoh/Rust-VRChat-OSC" }
 rosc = "0.9.1"
 egui = "0.20.1"
 eframe = "0.20.1"
