@@ -7,6 +7,8 @@ use vrchat_osc::{VRChatOSCType, VRChatOSC};
 use std::{error::Error};
 use eframe::epaint::ahash::HashMap;
 
+const DEFAULT_TO_VRCHAT_IP: &str = "127.0.0.1:9000";
+
 pub fn launch() {
     let eoptions = eframe::NativeOptions {
         drag_and_drop_support: true,
@@ -16,7 +18,7 @@ pub fn launch() {
     eframe::run_native(
         "VRChat Avatar",
         eoptions,
-        Box::new(|_cc| Box::new(App::default())),
+        Box::new(|_cc| Box::<App>::default()),
     );
 }
 
@@ -48,7 +50,7 @@ impl eframe::App for App {
             
             if self.engine.is_none() && ui.button("Connect").clicked() {
                 if self.target_ip.is_empty() {
-                    self.target_ip = "127.0.0.1:9000".to_string();
+                    self.target_ip = DEFAULT_TO_VRCHAT_IP.to_string();
                 }
                 ui.monospace("Connecting...");
                 self.engine = Some(VRChatOSC {

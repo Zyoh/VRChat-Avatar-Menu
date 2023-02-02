@@ -28,7 +28,7 @@ pub fn get_avatar_params<P>(path: P) -> Result<Vec<Parameter>, Box<dyn Error>> w
             let mut captures = cap.iter();
 
             if let Some(Some(_name)) = captures.nth(1) {
-                name = Some(_name.as_str().replace(" ", "_").to_string());
+                name = Some(_name.as_str().replace(' ', "_").to_string());
             }
         }
 
