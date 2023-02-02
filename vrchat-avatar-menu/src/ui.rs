@@ -25,7 +25,7 @@ pub fn launch() {
 #[derive(Default)]
 struct App {
     json_path: Option<String>,
-    param_values: HashMap<String, vrchat_osc::VRChatOSCType>,
+    params: HashMap<String, vrchat_osc::VRChatOSCType>,
     filter_name: String,
     target_ip: String,
     engine: Option<VRChatOSC>,
@@ -69,18 +69,18 @@ impl eframe::App for App {
             if ui.button("Choose avatar config...").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     self.json_path = Some(path.display().to_string());
-                    self.param_values.clear();
+                    self.params.clear();
 
                     for param in params::get_avatar_params(&path).unwrap() {
                         match param.ptype.to_lowercase().as_str() {
                             "float" => {
-                                self.param_values.insert(param.name, vrchat_osc::VRChatOSCType::Float(0.0));
+                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Float(0.0));
                             }
                             "int" => {
-                                self.param_values.insert(param.name, vrchat_osc::VRChatOSCType::Int(0));
+                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Int(0));
                             }
                             "bool" => {
-                                self.param_values.insert(param.name, vrchat_osc::VRChatOSCType::Bool(false));
+                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Bool(false));
                             }
                             _ => {}
                         }
@@ -88,7 +88,7 @@ impl eframe::App for App {
                 }
             }
 
-            ui.monospace(format!("Found {:?} params", self.param_values.len()));
+            ui.monospace(format!("Found {:?} params", self.params.len()));
 
             ui.horizontal(|ui| {
                 ui.monospace("Filter: ");
@@ -102,7 +102,10 @@ impl eframe::App for App {
             // Scrollable area
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui| {
                 ui.vertical(|ui| {
-                    for (name, value) in self.param_values.iter_mut() {
+                    let mut params: Vec<(&String, &mut VRChatOSCType)> = self.params.iter_mut().collect();
+                    params.sort_by(|a, b| a.0.cmp(b.0));
+
+                    for (name, value) in params {
                         if !name.starts_with(self.filter_name.as_str()) {
                             continue;
                         }
