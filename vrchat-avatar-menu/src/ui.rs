@@ -4,7 +4,7 @@ use crate::params;
 
 use vrchat_osc::{VRChatOSCType, VRChatOSC};
 
-use std::{error::Error};
+use std::{error::Error, path::PathBuf};
 use eframe::epaint::ahash::HashMap;
 
 const DEFAULT_TO_VRCHAT_IP: &str = "127.0.0.1:9000";
@@ -24,11 +24,23 @@ pub fn launch() {
 
 #[derive(Default)]
 struct App {
-    json_path: Option<String>,
+    avatar_osc_config_path: Option<PathBuf>,
     params: HashMap<String, vrchat_osc::VRChatOSCType>,
     filter_name: String,
     target_ip: String,
     engine: Option<VRChatOSC>,
+}
+
+impl App {
+    fn avatar_id(&self) -> Option<String> {
+        if let Some(path) = &self.avatar_osc_config_path {
+            if let Some(id) = path.file_stem() {
+                return Some(id.to_string_lossy().to_string());
+            }
+        }
+
+        None
+    }
 }
 
 impl eframe::App for App {
@@ -36,42 +48,45 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("VRChat Avatar");
 
-            if self.engine.is_none() {
-                ui.horizontal(|ui| {
-                    ui.monospace("Target IP: ");
-                    ui.text_edit_singleline(&mut self.target_ip);
-                });                
-            } else {
-                ui.horizontal(|ui| {
-                    ui.monospace("Target IP: ");
-                    ui.monospace(&self.target_ip);
-                });   
-            }
-            
-            if self.engine.is_none() && ui.button("Connect").clicked() {
-                if self.target_ip.is_empty() {
-                    self.target_ip = DEFAULT_TO_VRCHAT_IP.to_string();
+            // Connection
+            ui.horizontal(|ui| {
+                ui.monospace("Target IP: ");
+                if let Some(engine) = &self.engine {
+                    ui.monospace(engine.vrchat_listens_to_addr.clone());
+                } else {
+                    ui.monospace("None");
                 }
-                ui.monospace("Connecting...");
-                self.engine = Some(VRChatOSC {
-                    vrchat_listens_to_addr: self.target_ip.clone(),
-                    ..Default::default()
-                });
-            }
+            });
+
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut self.target_ip);
+
+                if ui.button("Connect").clicked() {
+                    if self.target_ip.is_empty() {
+                        self.target_ip = DEFAULT_TO_VRCHAT_IP.to_string();
+                    }
+                    ui.monospace("Connecting...");
+                    self.engine = Some(VRChatOSC {
+                        vrchat_listens_to_addr: self.target_ip.clone(),
+                        ..Default::default()
+                    });
+                }
+            });
+            
 
             if self.engine.is_none(){ 
                 return;
             }
 
-            ui.spacing();
+            // Avatar config
 
             // TODO: Open to VRChat OSC folder to make finding the config easier
             if ui.button("Choose avatar config...").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
-                    self.json_path = Some(path.display().to_string());
+                    self.avatar_osc_config_path = Some(path.clone());
                     self.params.clear();
 
-                    for param in params::get_avatar_params(&path).unwrap() {
+                    for param in params::get_avatar_params(path).unwrap() {
                         match param.ptype.to_lowercase().as_str() {
                             "float" => {
                                 self.params.insert(param.name, vrchat_osc::VRChatOSCType::Float(0.0));
@@ -88,14 +103,18 @@ impl eframe::App for App {
                 }
             }
 
+            if let Some(id) = self.avatar_id() {
+                ui.monospace(format!("Avatar ID: {id}"));
+            } else {
+                return;
+            }
+
             ui.monospace(format!("Found {:?} params", self.params.len()));
 
             ui.horizontal(|ui| {
                 ui.monospace("Filter: ");
                 ui.text_edit_singleline(&mut self.filter_name);
             });
-
-            ui.spacing();
 
             let engine = self.engine.as_ref().unwrap();
 
@@ -111,33 +130,37 @@ impl eframe::App for App {
                         }
                         
                         ui.horizontal(|ui| {
-                            match value {
-                                VRChatOSCType::Float(mut v) => {
-                                    let slider = egui::Slider::new(&mut v, 0.0..=1.0).text(name);
-                                    ui.add(slider);
-        
-                                    if value != &VRChatOSCType::Float(v) {
-                                        *value = VRChatOSCType::Float(v);
-                                        on_change(engine, name.clone(), value.clone()).unwrap();
-                                    }
-                                },
-                                VRChatOSCType::Bool(mut v) => {
-                                    ui.checkbox(&mut v, name);
-                                    
-                                    if value != &VRChatOSCType::Bool(v) {
-                                        *value = VRChatOSCType::Bool(v);
-                                        on_change(engine, name.clone(), value.clone()).unwrap();
-                                    }
-                                },
-                                VRChatOSCType::Int(mut v) => {
-                                    ui.add(egui::Slider::new(&mut v, 0..=255).text(name));
-                                    
-                                    if value != &VRChatOSCType::Int(v) {
-                                        *value = VRChatOSCType::Int(v);
-                                        on_change(engine, name.clone(), value.clone()).unwrap();
-                                    }
-                                },
-                            }
+                            ui.monospace(name);
+
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
+                                match value {
+                                    VRChatOSCType::Float(mut v) => {
+                                        let slider = egui::Slider::new(&mut v, 0.0..=1.0);
+                                        ui.add(slider);
+            
+                                        if value != &VRChatOSCType::Float(v) {
+                                            *value = VRChatOSCType::Float(v);
+                                            on_change(engine, name.clone(), value.clone()).unwrap();
+                                        }
+                                    },
+                                    VRChatOSCType::Bool(mut v) => {
+                                        ui.checkbox(&mut v, "");
+                                        
+                                        if value != &VRChatOSCType::Bool(v) {
+                                            *value = VRChatOSCType::Bool(v);
+                                            on_change(engine, name.clone(), value.clone()).unwrap();
+                                        }
+                                    },
+                                    VRChatOSCType::Int(mut v) => {
+                                        ui.add(egui::Slider::new(&mut v, 0..=255));
+                                        
+                                        if value != &VRChatOSCType::Int(v) {
+                                            *value = VRChatOSCType::Int(v);
+                                            on_change(engine, name.clone(), value.clone()).unwrap();
+                                        }
+                                    },
+                                }
+                            });
                         });
                     }
                 });

@@ -1,6 +1,6 @@
 // Copyright (c) 2023 Zoe <zoe@zyoh.ca>
 
-use std::{error::Error, io::Read};
+use std::{error::Error, io::Read, path::PathBuf};
 
 use regex::Regex;
 
@@ -10,7 +10,7 @@ pub struct Parameter {
     pub ptype: String,
 }
 
-pub fn get_avatar_params<P>(path: P) -> Result<Vec<Parameter>, Box<dyn Error>> where P: AsRef<std::path::Path> {
+pub fn get_avatar_params(path: PathBuf) -> Result<Vec<Parameter>, Box<dyn Error>> {
     // Why wouldn't serde just work?
 
     let mut params: Vec<Parameter> = Vec::new();
