@@ -1,10 +1,10 @@
 // Copyright (c) 2023 Zoe <zoe@zyoh.ca>
 
-use crate::params;
+use crate::params::{self, SavedParameter};
 
 use vrchat_osc::{VRChatOSCType, VRChatOSC};
 
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, path::{PathBuf, Path}};
 use eframe::epaint::ahash::HashMap;
 
 const DEFAULT_TO_VRCHAT_IP: &str = "127.0.0.1:9000";
@@ -36,6 +36,33 @@ impl App {
         if let Some(path) = &self.avatar_osc_config_path {
             if let Some(id) = path.file_stem() {
                 return Some(id.to_string_lossy().to_string());
+            }
+        }
+
+        None
+    }
+
+    fn avatar_data_path(&self) -> Option<PathBuf> {
+        // Path to avatar 3.0 save data for the current avatar (based on loaded config)
+
+        if let Some(config_path) = self.avatar_osc_config_path.as_deref() {
+            if let (
+                Some(Some(user_id)),
+                Some(vrchat_folder),
+                Some(id)
+            )
+            = (
+                config_path.ancestors().nth(2).map(|v| v.file_stem()), 
+                config_path.ancestors().nth(4), 
+                self.avatar_id()
+            ) {
+                let user_id = user_id.to_string_lossy();
+                let avatar_data_file = vrchat_folder
+                    .join(Path::new("LocalAvatarData"))
+                    .join(Path::new(user_id.as_ref()))
+                    .join(Path::new(&id));
+
+                return Some(avatar_data_file);
             }
         }
 
@@ -86,7 +113,7 @@ impl eframe::App for App {
                     self.avatar_osc_config_path = Some(path.clone());
                     self.params.clear();
 
-                    for param in params::get_avatar_params(path).unwrap() {
+                    for param in params::get_avatar_params(&path).unwrap() {
                         match param.ptype.to_lowercase().as_str() {
                             "float" => {
                                 self.params.insert(param.name, vrchat_osc::VRChatOSCType::Float(0.0));
@@ -99,6 +126,27 @@ impl eframe::App for App {
                             }
                             _ => {}
                         }
+                    }
+
+                    // Load saved params
+                    if let Some(avatar_data_path) = self.avatar_data_path() {
+                    if let Ok(saved_params) = SavedParameter::from_file(&avatar_data_path) {
+                        for saved_param in saved_params {
+                            if let Some(value) = self.params.get_mut(saved_param.name.as_str()) {
+                                match value {
+                                    VRChatOSCType::Float(v) => {
+                                        *v = saved_param.raw_value;
+                                    }
+                                    VRChatOSCType::Int(v) => {
+                                        *v = saved_param.raw_value as u8;
+                                    }
+                                    VRChatOSCType::Bool(v) => {
+                                        *v = saved_param.raw_value >= 0.5;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     }
                 }
             }
