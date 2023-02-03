@@ -2,7 +2,7 @@
 
 use crate::params::{self, SavedParameter};
 
-use vrchat_osc::{VRChatOSCType, VRChatOSC};
+use vrchat_osc as osc;
 
 use std::{error::Error, path::{PathBuf, Path}};
 use eframe::epaint::ahash::HashMap;
@@ -25,10 +25,10 @@ pub fn launch() {
 #[derive(Default)]
 struct App {
     avatar_osc_config_path: Option<PathBuf>,
-    params: HashMap<String, vrchat_osc::VRChatOSCType>,
+    params: HashMap<String, osc::Value>,
     filter_name: String,
     target_ip: String,
-    engine: Option<VRChatOSC>,
+    engine: Option<osc::Engine>,
 }
 
 impl App {
@@ -93,7 +93,7 @@ impl eframe::App for App {
                         self.target_ip = DEFAULT_TO_VRCHAT_IP.to_string();
                     }
                     ui.monospace("Connecting...");
-                    self.engine = Some(VRChatOSC {
+                    self.engine = Some(osc::Engine {
                         vrchat_listens_to_addr: self.target_ip.clone(),
                         ..Default::default()
                     });
@@ -116,13 +116,13 @@ impl eframe::App for App {
                     for param in params::get_avatar_params(&path).unwrap() {
                         match param.ptype.to_lowercase().as_str() {
                             "float" => {
-                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Float(0.0));
+                                self.params.insert(param.name, osc::Value::Float(0.0));
                             }
                             "int" => {
-                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Int(0));
+                                self.params.insert(param.name, osc::Value::Int(0));
                             }
                             "bool" => {
-                                self.params.insert(param.name, vrchat_osc::VRChatOSCType::Bool(false));
+                                self.params.insert(param.name, osc::Value::Bool(false));
                             }
                             _ => {}
                         }
@@ -134,13 +134,13 @@ impl eframe::App for App {
                         for saved_param in saved_params {
                             if let Some(value) = self.params.get_mut(saved_param.name.as_str()) {
                                 match value {
-                                    VRChatOSCType::Float(v) => {
+                                    osc::Value::Float(v) => {
                                         *v = saved_param.raw_value;
                                     }
-                                    VRChatOSCType::Int(v) => {
+                                    osc::Value::Int(v) => {
                                         *v = saved_param.raw_value as u8;
                                     }
-                                    VRChatOSCType::Bool(v) => {
+                                    osc::Value::Bool(v) => {
                                         *v = saved_param.raw_value >= 0.5;
                                     }
                                 }
@@ -169,7 +169,7 @@ impl eframe::App for App {
             // Scrollable area
             egui::ScrollArea::vertical().auto_shrink([true, true]).show(ui, |ui| {
                 ui.vertical(|ui| {
-                    let mut params: Vec<(&String, &mut VRChatOSCType)> = self.params.iter_mut().collect();
+                    let mut params: Vec<(&String, &mut osc::Value)> = self.params.iter_mut().collect();
                     params.sort_by(|a, b| a.0.cmp(b.0));
 
                     for (name, value) in params {
@@ -182,28 +182,28 @@ impl eframe::App for App {
 
                             ui.with_layout(egui::Layout::right_to_left(egui::Align::RIGHT), |ui| {
                                 match value {
-                                    VRChatOSCType::Float(mut v) => {
+                                    osc::Value::Float(mut v) => {
                                         let slider = egui::Slider::new(&mut v, 0.0..=1.0);
                                         ui.add(slider);
             
-                                        if value != &VRChatOSCType::Float(v) {
-                                            *value = VRChatOSCType::Float(v);
+                                        if value != &osc::Value::Float(v) {
+                                            *value = osc::Value::Float(v);
                                             on_change(engine, name.clone(), value.clone()).unwrap();
                                         }
                                     },
-                                    VRChatOSCType::Bool(mut v) => {
+                                    osc::Value::Bool(mut v) => {
                                         ui.checkbox(&mut v, "");
                                         
-                                        if value != &VRChatOSCType::Bool(v) {
-                                            *value = VRChatOSCType::Bool(v);
+                                        if value != &osc::Value::Bool(v) {
+                                            *value = osc::Value::Bool(v);
                                             on_change(engine, name.clone(), value.clone()).unwrap();
                                         }
                                     },
-                                    VRChatOSCType::Int(mut v) => {
+                                    osc::Value::Int(mut v) => {
                                         ui.add(egui::Slider::new(&mut v, 0..=255));
                                         
-                                        if value != &VRChatOSCType::Int(v) {
-                                            *value = VRChatOSCType::Int(v);
+                                        if value != &osc::Value::Int(v) {
+                                            *value = osc::Value::Int(v);
                                             on_change(engine, name.clone(), value.clone()).unwrap();
                                         }
                                     },
@@ -217,8 +217,8 @@ impl eframe::App for App {
     }
 }
 
-fn on_change(engine: &VRChatOSC, addr: String, value: VRChatOSCType) -> Result<(), Box<dyn Error>> {
-    engine.send_vrc_input(vrchat_osc::VRChatOSCInput::Avatar(addr, value))?;
+fn on_change(engine: &osc::Engine, addr: String, value: osc::Value) -> Result<(), Box<dyn Error>> {
+    engine.send(osc::Input::Avatar(addr, value))?;
 
     Ok(())
 }
